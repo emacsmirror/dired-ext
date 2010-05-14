@@ -53,7 +53,7 @@ Any matching files will be placed in a new dired buffer with name *duplicated fi
 		  (when (string-equal (car arg) (car pair))
 		    (push (cdr pair) orignal-matched-files)
 		    (push (cdr arg) duplicated-matched-files))) tobe-checked-pair))
-      (dired (cons "*duplicated files*" duplicated-matched-files))
+      (dired (cons "*duplicated files*" (reverse duplicated-matched-files)))
 
       (dired-ext-kill-buffer "*Shell Command Output*")
       (message "Find duplicated files done"))
