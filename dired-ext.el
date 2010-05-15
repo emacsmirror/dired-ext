@@ -28,7 +28,8 @@
   "Find the duplicated files and put them in a dired buffer.
 FILES is a list of files which will be compared. DIR is the directory
 which will be checked for duplicates of any of the files in the list.
-Any matching files will be placed in a new dired buffer with name *duplicated files*."
+Any matching files will be placed in a new dired buffer with name
+*duplicated files*."
   (interactive (list (dired-get-marked-files)
 		     (read-directory-name "Directory to be checked: ")))
 
@@ -53,26 +54,59 @@ Any matching files will be placed in a new dired buffer with name *duplicated fi
 		  (when (string-equal (car arg) (car pair))
 		    (push (cdr pair) orignal-matched-files)
 		    (push (cdr arg) duplicated-matched-files))) tobe-checked-pair))
-      (dired (cons "*duplicated files*" (reverse duplicated-matched-files)))
-
+      
       (dired-ext-kill-buffer "*Shell Command Output*")
       (message "Find duplicated files done"))
 
-    (switch-to-buffer original-buffer-name)
-    (when (and curr-arg (= curr-arg 4) files)	; C-u is used and there is marked file
-      (dired-map-over-marks
-       (let ((file-name (dired-get-filename)))
-	 (when (member* file-name orignal-matched-files :test #'string-equal)
-	   (dired-flag-file-deletion 1)))
-       nil))
-    (delete-other-windows)
-    (split-window-vertically)
-    (switch-to-buffer-other-window "*duplicated files*")
-    (when (and curr-arg (= curr-arg 16) duplicated-matched-files) ; C-u C-u is used
-      ;; all the files should be marked for deletion
-      (dired-map-dired-file-lines
-       #'(lambda (arg)
-	   (dired-flag-file-deletion 1))))))
+    (if (or (null curr-arg) (= curr-arg 4) (= curr-arg 16))
+	(progn
+	  (dired (cons "*duplicated files*" (reverse duplicated-matched-files)))
+	  (switch-to-buffer original-buffer-name)
+	  (when (and curr-arg (= curr-arg 4) files)	; C-u is used and there is marked file
+	    (dired-map-over-marks
+	     (let ((file-name (dired-get-filename)))
+	       (when (member* file-name orignal-matched-files :test #'string-equal)
+		 (dired-flag-file-deletion 1)))
+	     nil))
+	  (delete-other-windows)
+	  (split-window-vertically)
+	  (switch-to-buffer-other-window "*duplicated files*")
+	  (when (and curr-arg (= curr-arg 16) duplicated-matched-files) ; C-u C-u is used
+	    ;; all the files should be marked for deletion
+	    (dired-map-dired-file-lines
+	     #'(lambda (arg)
+		 (dired-flag-file-deletion 1)))))
+      
+      ;; 3 or 4 prefix arg is used
+      (let ((original-duplicate-list nil))
+	(mapcar* #'(lambda (arg1 arg2)
+		     (let ((find-it (member* arg1 original-duplicate-list :test #'string-equal :key #'car)))
+		       (if find-it
+			   (setf (car find-it) (append (car find-it) (list arg2)))
+			 (push (list arg1 arg2) original-duplicate-list))))
+		 orignal-matched-files
+		 duplicated-matched-files)
+
+	(dired (cons "*duplicated files*" (reduce #'append (reverse original-duplicate-list))))
+	(switch-to-buffer "*duplicated files*")
+	(delete-other-windows)
+	
+	(if (= curr-arg 64)
+	    ;; mark orginal files for deletion
+	    (dired-map-dired-file-lines
+	     #'(lambda (file)
+		 (when (member* file original-duplicate-list :test #'string-equal
+				:key #'(lambda (arg)
+					 (file-truename (car arg))))
+		   (dired-flag-file-deletion 1))))
+	    (if (= curr-arg 256)
+		;; mark duplicated files for deletion
+		(dired-map-dired-file-lines
+		 #'(lambda (file)
+		     (when (member* file duplicated-matched-files :test #'string-equal
+				    :key #'(lambda (arg)
+					     (file-truename arg)))
+		       (dired-flag-file-deletion 1))))))))))
 
 (defun dired-ext-md5-file-pair ()
   "Get an alist of (md5 . file) in buffer *Shell Command Output*."
