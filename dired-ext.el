@@ -23,8 +23,8 @@
 ;; 
 
 ;;; Code:
-
-(defun dired-find-duplicates (files dir)
+(eval-when-compile (require 'cl))
+(defun* dired-find-duplicates (files dir)
   "Find the duplicated files and put them in a dired buffer.
 FILES is a list of files which will be compared. DIR is the directory
 which will be checked for duplicates of any of the files in the list.
@@ -51,13 +51,22 @@ Any matching files will be placed in a new dired buffer with name
       ;; find the matched files
       (dolist (pair marked-pair)
 	(mapc #'(lambda (arg)
-		  (when (string-equal (car arg) (car pair))
+		  (when (and (string-equal (car arg) (car pair))
+			     ;; ignore the exactly same file
+			     (not (string-equal (cdr arg) (cdr pair))))
 		    (push (cdr pair) orignal-matched-files)
 		    (push (cdr arg) duplicated-matched-files))) tobe-checked-pair))
       
-      (dired-ext-kill-buffer "*Shell Command Output*")
-      (message "Find duplicated files done"))
+      (dired-ext-kill-buffer "*Shell Command Output*"))
 
+    (when (null duplicated-matched-files)
+      ;; when there are no duplicated files, simply return to avoid the
+      ;; error when calling (dired (cons "name" nil))
+      (message "No duplicated files found!")
+      (return-from dired-find-duplicates))
+    
+    (message "Find duplicated files done")
+    
     (if (or (null curr-arg) (= curr-arg 4) (= curr-arg 16))
 	(progn
 	  (dired (cons "*duplicated files*" (reverse duplicated-matched-files)))
